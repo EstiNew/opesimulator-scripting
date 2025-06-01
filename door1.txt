@@ -1,0 +1,170 @@
+integer giHingeSide = 1;
+
+
+integer giSwingDirection = 1;
+
+
+integer giDegreesToOpenDoor = 90;
+
+
+
+
+
+
+integer giDegreesPerStep = 1;
+float   gfSecondsPausePerStep = 0.002;
+
+integer gbCloseAfterTimeExpires = TRUE;
+float   gfSecondToLeaveOpen = 25.0; 
+
+
+
+integer gbListenToOpenChatForOpenClose = TRUE; 
+integer giListenChannel = 0;            
+string gsOpenCommand = "OpenDoor";      
+string gsCloseCommand = "CloseDoor";    
+
+
+
+
+
+integer    gbDoorIsClosed = TRUE;
+vector     gvClosedDoorPos;
+quaternion gqClosedDoorRot;
+
+integer    giListenHandle;
+
+
+SwingTheDoor()
+{
+    
+    
+    
+    
+    
+    
+    vector     vDoorPos;
+    quaternion qDoorRot;
+    vector     vDoorScale;
+    vector     vHingePos;
+    vector     vOrigRadiusVector;
+    
+    integer    iStepCount;
+    quaternion qHingeOrbitStep;
+    quaternion qHingeOrbitAngle;
+    
+    vector     vNewRadiusVector;
+    vector     vNewPos;
+    quaternion qNewRot;
+    
+    integer    iSwingDir;
+    
+    
+    iSwingDir = giSwingDirection;
+    if (gbDoorIsClosed)
+    {
+        
+        gvClosedDoorPos = llGetLocalPos();
+        gqClosedDoorRot = llGetLocalRot();
+        
+        llMessageLinked(LINK_THIS, 0, "MakeOpenDoorSound", "");
+    }
+    else
+    {
+        iSwingDir = iSwingDir * -1;
+    }
+    
+    vDoorPos = llGetLocalPos(); 
+    qDoorRot = llGetLocalRot();
+    vDoorScale = llGetScale();
+    vOrigRadiusVector = <0.0, 0.0, 0.0>; 
+    
+    
+    
+    if (vDoorScale.x > vDoorScale.y) vOrigRadiusVector.x = vOrigRadiusVector.x + giHingeSide * vDoorScale.x / 2;
+    else                             vOrigRadiusVector.y = vOrigRadiusVector.y + giHingeSide * vDoorScale.y / 2;
+    
+    
+    vOrigRadiusVector = vOrigRadiusVector * qDoorRot; 
+    
+    vHingePos = vDoorPos - vOrigRadiusVector;
+    
+    
+    
+    qHingeOrbitStep = llEuler2Rot(<0.0, 0.0, giDegreesPerStep * DEG_TO_RAD * iSwingDir>);
+    
+    for(iStepCount = 1; iStepCount * giDegreesPerStep <= giDegreesToOpenDoor; iStepCount++)
+    {
+        
+        qHingeOrbitAngle = llAxisAngle2Rot(llRot2Axis(qHingeOrbitStep), iStepCount * llRot2Angle(qHingeOrbitStep));
+        
+        vNewRadiusVector = vOrigRadiusVector * qHingeOrbitAngle;
+        
+        vNewPos = vHingePos + vNewRadiusVector;
+        
+        
+        qNewRot = qDoorRot * qHingeOrbitAngle;
+        
+        llSetLinkPrimitiveParamsFast(llGetLinkNumber(), [PRIM_POS_LOCAL, vNewPos, PRIM_ROT_LOCAL, qNewRot]);
+        if (gfSecondsPausePerStep) llSleep(gfSecondsPausePerStep);
+    }
+    
+    gbDoorIsClosed = !gbDoorIsClosed;
+    if (gbDoorIsClosed)
+    {
+        
+        
+        llSetLinkPrimitiveParams(llGetLinkNumber(), [PRIM_POS_LOCAL, gvClosedDoorPos, PRIM_ROT_LOCAL, gqClosedDoorRot]);
+        
+        llMessageLinked(LINK_THIS, 0, "MakeCloseDoorSound", "");
+    }
+    else
+    {
+        
+        qHingeOrbitAngle = llEuler2Rot(<0.0, 0.0, giDegreesToOpenDoor * DEG_TO_RAD * iSwingDir>);
+        vNewRadiusVector = vOrigRadiusVector * qHingeOrbitAngle;
+        vNewPos = vHingePos + vNewRadiusVector;
+        qNewRot = qDoorRot * qHingeOrbitAngle;
+        llSetLinkPrimitiveParams(llGetLinkNumber(), [PRIM_POS_LOCAL, vNewPos, PRIM_ROT_LOCAL, qNewRot]);
+        
+        if (gbCloseAfterTimeExpires) llSetTimerEvent(gfSecondToLeaveOpen);
+    }
+}
+
+default
+{
+    on_rez(integer iParam) 
+    {
+        llResetScript();
+    }
+    state_entry()
+    {
+        if (gbListenToOpenChatForOpenClose) giListenHandle = llListen(giListenChannel, "", "", "");
+    }
+    listen(integer iChannel, string sSenderPrimOrAviLegacyName, key kSenderKey, string sMsg)
+    {
+        if (llToUpper(sMsg) == llToUpper(gsOpenCommand))  if (gbDoorIsClosed == TRUE)  SwingTheDoor();
+        if (llToUpper(sMsg) == llToUpper(gsCloseCommand)) if (gbDoorIsClosed == FALSE) SwingTheDoor();
+    }
+    touch(integer iNumDetected) 
+    {
+        if (llGetTime() < 3.0) return; 
+        
+        llResetTime();
+        SwingTheDoor();
+    }
+    collision(integer iNumDetected) 
+    {
+        if (llGetTime() < 3.0) return; 
+        llResetTime();
+        SwingTheDoor();
+    }
+  
+    timer() 
+    {
+        llSetTimerEvent(3.0);
+        if (!gbDoorIsClosed) SwingTheDoor();
+    }
+}
+
+

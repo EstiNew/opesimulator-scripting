@@ -1,0 +1,403 @@
+//=====================================================================
+//
+//       ~ MASON KAS' ULTRA SMOOTH ROTATING DOOR OPENER SCRIPT ~
+//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//                             Kas & Thei
+//     Purveyors of Humble Yet Superlative Merchandise & Scripting
+//                     Bespoke & Off the Shelf Items
+//
+// Find us inworld at:
+// http://slurl.com/secondlife/Academy%20of%20Industry/176/150/111
+//
+// Mason Kas on Xstreet:
+// http://xstreetsl.com/modules.php?name=Marketplace&MerchantID=265853
+//
+// Thaiis Thei on Xstreet:
+// http://xstreetsl.com/modules.php?name=Marketplace&MerchantID=151603
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// Just drop this script on any door and click to open.
+// It's that easy. The door is phantom while opening to avoid
+// bumping into it. 
+// 
+// Works on doors that are part of a linked set of objects.
+// If the door is the root prim, the entire linked set will
+// rotate.  If it's not, only the door will rotate.
+//
+// By default the door rotates around its centre. To make it
+// rotate around one side, if it is a tall, rectangular door,
+// just right click the door to edit it and, in the object
+// tab, set 'Path Cut Begin' to 0.125 and 'Path Cut End' to
+// 0.375. Presto chango! Door rotates around the side. Easy.
+// For other shaped doors just use the same principle and
+// tweak the settings as required.
+//
+// IMPORTANT NOTE:  Only change these options while the door
+// is closed.  The position it is in before you add the script 
+// is the closed position. If you save the script while the 
+// door is open, the door may become confused about its 
+// state; it will think it's open when it should be closed.  
+// If this happens, simply rotate the door 90 degrees back 
+// to where it should be when closed.
+//
+// The axis specified below determines the axis around which
+// the door will rotate.  Specify AXIS = "X", "-X", "Y", "-Y",
+// "Z" or "-Z" for each of the six possible directions of
+// rotation.  Alternately, just leave it set to "Z" and then
+// physically rotate the door so it rotates in the direction
+// you want it to rotate (this can be easier, and will work
+// properly with the path cut specified above).
+//
+
+// Second Door Channel
+
+integer doorchannel=10000;
+
+//
+
+string AXIS = "-Z";
+
+//
+// Ordinarily the door will rotate 90 degrees.  You can change
+// this below.  Valid values are between 1 and 360 degrees.
+//
+
+float DEGREES = 90.0;
+
+//
+// The door will make a sound when it opens or closes.  If you
+// don't want sound, specify PLAY_SOUND = FALSE below:
+//
+
+integer PLAY_SOUND = TRUE;
+
+//
+// If you would like to use your own sounds instead of the default
+// sounds, drag your sounds into the object's contents, then specify
+// their names below in place of DEFAULT.  You can use the same
+// sound for both opening and closing if you like:
+//
+
+string OPEN_SOUND = "f62fe8b8-d4dd-402d-b8db-a442693af5b2";
+string CLOSE_SOUND = "7787a811-1c0e-44b9-aea3-a24187e3ccbf";
+
+//
+// Once you add the script anyone can open the door. If you want
+// to restrict access you need to edit the list of authorized
+// users below. If this list is empty (i.e.
+// 'list AUTHORIZED_USERS = [];'), anyone can open the door
+// by touching it.  If you want to restrict access to only
+// certain users, just type their names in, e.g.:
+//
+//      list AUTHORIZED_USERS = ["First Friend", "Second Friend", "Third Friend"];
+//
+// If you want to be the only person able to open the door
+// place only your name in the list, e.g.:
+//
+//      list AUTHORIZED_USERS = ["Your Name"];
+//
+
+list AUTHORIZED_USERS = [];
+
+//
+// You can allow all members of a group to open the door,
+// without having to type every single name into the list.
+// Just change the group of the object to the group you want
+// to allow access to, and set 'ALWAYS_ALLOW_GROUP = TRUE'
+// below (the default setting is, ALWAYS_ALLOW_GROUP = FALSE, 
+// which means the group will not be allowed access automatically).
+//
+
+integer ALWAYS_ALLOW_GROUP = FALSE;
+
+//
+// The door will close automatically after ten seconds or when
+// touched, whichever happens first. You can easily change the
+// time the doors stays open by changing the number of seconds
+// below.  If you set it to 0.0, the door will open and then 
+// remain open.
+//
+
+float CLOSE_DOOR_AFTER = 10.0;
+
+//
+// The door will ordinarily take about three seconds to open
+// or close.  To make it slower or faster, increase or
+// decrease the number of seconds below.  Note that this
+// figure is only approximate - experiment to get the effect
+// you desire.
+//
+
+float APPROXIMATE_SPEED_IN_SECONDS = 3.0;
+
+string ramp1state="ramp1closed";
+
+//
+// DO NOT CHANGE ANYTHING BELOW THIS LINE
+//=====================================================================
+
+// These are -90 degrees and 90 degrees respectively:
+rotation OPEN = <0.0, 0.0, 1.0, 1.0>;
+rotation CLOSED = <0.0, 0.0, 1.0, -1.0>;
+
+float RADIANS_TO_ROTATE;
+
+// minimum door speed (don't change this)
+float MIN_SPEED = 0.5;
+
+string DEFAULT_OPEN_SOUND  = "cb340647-9680-dd5e-49c0-86edfa01b3ac";
+string DEFAULT_CLOSE_SOUND = "e7ff1054-003d-d134-66be-207573f2b535";
+
+// Parsed Axis (excluding direction component)
+string paxis;
+// Direction component
+integer dir;
+
+// Set up sounds, axis, etc.
+init()
+{
+    if (DEGREES < 1.0) { DEGREES = 1.0; }
+    if (DEGREES > 360.0) { DEGREES = 360.0; }
+    
+    RADIANS_TO_ROTATE = DEGREES * DEG_TO_RAD;
+
+    dir = 1;
+    
+    paxis = llStringTrim(llToUpper(AXIS), STRING_TRIM);
+    if (llStringLength(paxis) == 2)
+    {
+        if (llGetSubString(paxis, 0, 0) == "-")
+        {
+            dir = -1;
+        }
+        else if (llGetSubString(paxis, 0, 0) != "+")
+        {
+            llOwnerSay("Invalid AXIS (" + AXIS + ") - assuming you meant \"Z\"");
+            paxis = "+Z";            
+        }
+        // Got direction, strip back to one character.
+        paxis = llGetSubString(paxis, 1, 1);
+    }
+    if (paxis != "X" && paxis != "Y" && paxis != "Z")
+    {
+        llOwnerSay("Invalid AXIS (" + AXIS + ") - assuming you meant \"Z\"");
+        paxis = "Z";
+    }
+
+    if (paxis == "X")       { OPEN = llEuler2Rot(<RADIANS_TO_ROTATE * dir, 0.0, 0.0>); }
+    else if (paxis == "Y")  { OPEN = llEuler2Rot(<0.0, RADIANS_TO_ROTATE * dir, 0.0>); }
+    else                    { OPEN = llEuler2Rot(<0.0, 0.0, RADIANS_TO_ROTATE * dir>); }
+    CLOSED = OPEN;
+    CLOSED.s *= -1;
+            
+    OPEN_SOUND = llStringTrim(OPEN_SOUND, STRING_TRIM);
+    if (llToUpper(OPEN_SOUND) == "DEFAULT" ||
+        llStringLength(OPEN_SOUND) == 0)
+    {
+        OPEN_SOUND = DEFAULT_OPEN_SOUND;
+    }
+    CLOSE_SOUND = llStringTrim(CLOSE_SOUND, STRING_TRIM);
+    if (llToUpper(CLOSE_SOUND) == "DEFAULT" ||
+        llStringLength(CLOSE_SOUND) == 0)
+    {
+        CLOSE_SOUND = DEFAULT_CLOSE_SOUND;
+    }
+}
+
+trigger_sound(string s)
+{
+    if (PLAY_SOUND)
+    {
+        llTriggerSound(s, 1.0);
+    }
+}
+
+default
+{
+    on_rez(integer start_param)
+    {
+        llResetScript();
+    }
+    
+    state_entry() 
+    {
+        llListen(doorchannel, "", NULL_KEY, "");
+        // No more timer events (only need 'em when the door is open)
+        llSetTimerEvent(0.0);
+        init();
+    }
+    
+    listen(integer channel, string name, key id, string message)
+    {
+        if(message=="frontdoor") 
+        {
+            state opening;   
+        }
+    }
+
+    touch_start(integer total_number) 
+    {
+        // Open the door if...
+        if (llGetOwner() == llDetectedKey(0) ||             // ...the owner touched it, or...
+            (ALWAYS_ALLOW_GROUP && llDetectedGroup(0)) ||   // ...the group is valid, or...
+            llGetListLength(AUTHORIZED_USERS) == 0 ||       // ...everyone is allowed, or...
+            llListFindList(AUTHORIZED_USERS, [llDetectedName(0)]) >= 0) // ...the user is in the list.
+        {
+            state opening;
+        }
+    }    
+}
+
+state opening
+{
+    on_rez(integer start_param)
+    {
+        // Back to default state when rezzed
+        state default;
+    }
+
+    state_entry()
+    {
+        trigger_sound(OPEN_SOUND);
+        float speed = APPROXIMATE_SPEED_IN_SECONDS;
+        if (speed < MIN_SPEED) speed = MIN_SPEED;
+        
+        vector axis;
+        if (paxis == "X")       { axis = llRot2Fwd(OPEN * llGetLocalRot());  }
+        else if (paxis == "Y")  { axis = llRot2Left(OPEN * llGetLocalRot()); }
+        else                    { axis = llRot2Up(OPEN * llGetLocalRot());   }
+        axis *= dir;
+        
+        llTargetOmega(axis, RADIANS_TO_ROTATE / speed, 1.0);
+        llSetTimerEvent(speed);
+    }
+
+    timer()
+    {
+        state open;
+    }
+   
+    touch_start(integer total_number)
+    {
+        // Do nothing, but need the event or touch doesn't work
+        // right in the other states.
+    }
+      
+    state_exit()
+    {
+        llTargetOmega(ZERO_VECTOR, 0.0, 0.0);
+        llSetLocalRot(OPEN * llGetLocalRot());
+    }
+}
+
+state open
+{
+    on_rez(integer start_param)
+    {
+        // Back to default state when rezzed
+        state default;
+    }
+
+    state_entry()
+    {
+        // Close the door after some number of seconds
+        llSetTimerEvent(CLOSE_DOOR_AFTER);
+    }
+    
+    touch_start(integer total_number)
+    {
+        // Close door when touched
+        state closing;
+    }
+    
+    timer()
+    {
+        // Close door when timer expires
+        state closing;
+    }
+}
+
+state closing
+{
+    on_rez(integer start_param)
+    {
+        // Back to default state when rezzed
+        state default;
+    }
+
+    state_entry()
+    {
+        trigger_sound(CLOSE_SOUND);
+        float speed = APPROXIMATE_SPEED_IN_SECONDS;
+        if (speed < MIN_SPEED) speed = MIN_SPEED;
+        
+        vector axis;
+        if (paxis == "X")       { axis = llRot2Fwd(OPEN * llGetLocalRot());  }
+        else if (paxis == "Y")  { axis = llRot2Left(OPEN * llGetLocalRot()); }
+        else                    { axis = llRot2Up(OPEN * llGetLocalRot());   }
+        axis *= dir * -1;       // still need to invert here (*sigh*)
+        
+        llTargetOmega(axis, RADIANS_TO_ROTATE / speed, 1.0);
+        llSetTimerEvent(speed);
+    }
+
+    timer()
+    {
+        state default;
+    }
+
+    touch_start(integer total_number)
+    {
+        // Do nothing, but need the event or touch doesn't work
+        // right in the other states.
+    }
+
+    state_exit()
+    {
+        llTargetOmega(ZERO_VECTOR, 0.0, 0.0);
+        llSetLocalRot(CLOSED * llGetLocalRot());
+    }
+}
+
+state forward
+{
+    on_rez(integer start_param)
+    {
+        // Back to default state when rezzed
+        state default;
+    }
+
+    state_entry()
+    {
+        trigger_sound(CLOSE_SOUND);
+        float speed = APPROXIMATE_SPEED_IN_SECONDS;
+        if (speed < MIN_SPEED) speed = MIN_SPEED;
+        
+        vector axis;
+        if (paxis == "X")       { axis = llRot2Fwd(CLOSED * llGetLocalRot());  }
+        else if (paxis == "Y")  { axis = llRot2Left(CLOSED * llGetLocalRot()); }
+        else                    { axis = llRot2Up(CLOSED * llGetLocalRot());   }
+        axis *= dir;       // still need to invert here (*sigh*)
+        
+        llTargetOmega(axis, RADIANS_TO_ROTATE / speed, 1.0);
+        llSetTimerEvent(speed);
+    }
+
+    timer()
+    {
+        state default;
+    }
+
+    touch_start(integer total_number)
+    {
+        // Do nothing, but need the event or touch doesn't work
+        // right in the other states.
+    }
+
+    state_exit()
+    {
+        llTargetOmega(ZERO_VECTOR, 0.0, 0.0);
+        llSetLocalRot(OPEN * llGetLocalRot());
+    }
+}

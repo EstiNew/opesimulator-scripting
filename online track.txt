@@ -1,0 +1,52 @@
+key ownerkey;
+string agent;
+integer x = 0;
+integer y = 0;
+default
+{
+    on_rez(integer start_param)
+    {
+        llResetScript();
+    }
+    
+    state_entry()
+    {
+        ownerkey = "YOUR AVATAR KEY";
+        agent = "YOUR TARGET";
+        llSetTimerEvent(1.0); //check every 30 seconds
+        llRequestAgentData(ownerkey, DATA_ONLINE);
+    }
+ 
+    timer()
+    {
+        llRequestAgentData(ownerkey, DATA_ONLINE);
+    }
+    
+    dataserver(key request, string data)
+    {
+        
+        if (data == "1")
+        {
+            y = 0;
+           // llSetText(agent + " is Online", <0,1,0>, 1);
+            x = x + 1;
+            if(x == 1)
+            {
+                string email_address = "your email for email notification";
+                llEmail( email_address, agent+" is Online", "");
+            }
+        }
+        else
+        {
+            x = 0;
+            y = y + 1;
+            if(y == 1)
+            {
+                string email_address = "your email for email notification";
+                llEmail( email_address,agent+" is Offline", "");
+            }
+      //      llSetText(agent + " is Offline", <1,0,0>, 1);
+        }
+    }
+}
+ 

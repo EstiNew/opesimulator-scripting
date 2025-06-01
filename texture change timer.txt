@@ -1,0 +1,27 @@
+// Texture Switcher
+// by Dackedidi Miles
+//
+float Timer = 0.8; // speed in seconds
+//
+//
+integer choice;
+default
+{
+   state_entry()
+    {
+            llSetTimerEvent(Timer);
+    }
+    
+     timer()
+    {
+        integer number = llGetInventoryNumber(INVENTORY_TEXTURE);
+        choice ++;
+        if (choice == number)
+            choice = 0;
+            
+        string name = llGetInventoryName(INVENTORY_TEXTURE, choice);
+        
+        if (name != "")
+            llSetTexture(name, ALL_SIDES);
+    }
+}

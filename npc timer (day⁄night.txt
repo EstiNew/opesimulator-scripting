@@ -1,0 +1,39 @@
+float   TimerInterval = 10.0;
+
+default
+{
+    state_entry()
+    {
+        llSetTimerEvent(TimerInterval); 
+        llMessageLinked(LINK_SET, 0, "day", "");
+    }
+    
+    timer()
+    {
+        vector sun = llGetSunDirection();
+        if (sun.z < 0) state night;
+    }
+}
+
+state night
+{
+    state_entry()
+    {
+        llSetTimerEvent(TimerInterval); 
+        llMessageLinked(LINK_SET, 0, "night", "");
+    }
+    
+    timer()
+    {
+        vector sun = llGetSunDirection();
+        if (sun.z > 0) state default; 
+    }
+    
+    changed(integer change)
+    {
+        if (change & (CHANGED_REGION_START | CHANGED_REGION))
+        {
+            state default;
+        }
+    }
+}

@@ -1,0 +1,130 @@
+//Slow open, Slow Close Door
+//One Prim cut 0.125,0.625 with cut as hinge
+//Auto close included
+
+// Smooth Door Script - Version 1.1
+ // by Toy Wylie
+ // swing on z axis changes by Clarke Kondor
+ // Distributed under the following licence:
+ // - You can use it in your own works
+ // - You can sell it with your work
+ // - This script must remain full permissions
+ // - This header notice must remain intact
+ // - You may modify this script as needed
+  
+ float openingTime=2.0;      // in seconds
+ float openingAngle=100.0;    // in degrees
+ float autocloseTime=15.0;    // in seconds
+ integer steps=1;            // number of internal rotation steps
+ integer useOmega=TRUE; 
+ float omega=0.0;
+  
+ vector axis;
+ rotation closedRot;
+ rotation openRot;
+  
+ integer swinging;
+ integer open;
+  
+ openDoor(integer yes)
+ {
+     vector useAxis=axis;
+     open=yes;
+  
+     if(!yes)
+         useAxis=-axis;
+  
+     llSetTimerEvent(openingTime/(float) steps);
+     if (useOmega) llTargetOmega(useAxis,omega,1.0);
+ }
+  
+ go()
+ {
+     if(swinging==0)
+     {
+         if(!open)
+         {
+             axis=llRot2Up(llGetLocalRot());
+             closedRot=llGetLocalRot();
+             openRot=llEuler2Rot(<0.0,0.0,openingAngle>*DEG_TO_RAD)*closedRot;
+         }
+         swinging=steps;
+         openDoor(!open);
+     }
+ }
+  
+ rotation  slerp(rotation source,rotation target,float amount)
+ {
+     float startAngle = llRot2Angle(source);
+     float endAngle = llRot2Angle(target);
+     
+     //llOwnerSay((string)startAngle+ " " + (string)(startAngle*RAD_TO_DEG));
+     //llOwnerSay((string)(endAngle*RAD_TO_DEG));
+    // llOwnerSay(llRot2Axis(source*target));
+     float thisAngle = (endAngle-startAngle) * amount + startAngle;
+     //llOwnerSay((string)(thisAngle*RAD_TO_DEG));
+     //if (thisAngle > PI) thisAngle -= TWO_PI;
+     //llOwnerSay((string)(thisAngle*RAD_TO_DEG));
+     
+     rotation newRot;
+     newRot = llAxisAngle2Rot(llRot2Axis(source*target),thisAngle);
+     //newRot = llAxisAngle2Rot(<0.0,0.0,1.0>,thisAngle);
+     //newRot = llAxisAngle2Rot(xaxis,thisAngle);
+     return newRot;
+ }
+  
+ default
+ {
+     state_entry()
+     {
+         swinging=0;
+         open=FALSE;
+         omega=DEG_TO_RAD*openingAngle/openingTime;
+         //omega=TWO_PI/360*openingAngle/openingTime;
+         if (useOmega) llTargetOmega(ZERO_VECTOR,1.0,1.0);
+     }
+  
+     touch_start(integer dummy)
+     {
+         go();
+     }
+  
+     collision_start(integer dummy)
+     {
+         go();
+     }
+  
+     timer()
+     {
+         if(swinging>0)
+         {
+             swinging--;
+             if(swinging!=0)
+             {
+                 float amount=(float) swinging/(float) steps;
+                 if(open)
+                     amount=1.0-amount;
+                 llSetLocalRot(slerp(closedRot,openRot,amount));
+                 return;
+             }
+  
+             if (useOmega) llTargetOmega(axis,0.0,0.0);
+             if(open)
+             {
+                 llSetLocalRot(openRot);
+                 llSetTimerEvent(autocloseTime);
+             }
+             else
+             {
+                 llSetLocalRot(closedRot);
+                 llSetTimerEvent(0.0);
+             }
+         }
+         else // autoclose time reached
+         {
+             llSetTimerEvent(0.0);
+             openDoor(!open);
+             swinging=steps;
+         }
+     }
+ }

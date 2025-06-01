@@ -1,0 +1,359 @@
+integer debug = FALSE;         
+integer iTitleText = FALSE;    
+
+
+float RADIUS = 0;    
+float RATE = 5.0;  
+
+
+string dancerFirstName="Haik";
+string dancerLastName="the Blacksmith";
+
+
+
+
+
+
+string danceSeq="seq";          
+
+
+float danceTimer=15.0;
+
+
+integer active=TRUE;
+
+
+vector offSet=<0.0, 1.0, 0.60>;
+vector rot = <0,0,0>; 
+
+vector RezPos = <0,0,1.0>;    
+
+
+
+integer  NPCOptions = OS_NPC_CREATOR_OWNED;    
+
+
+integer PRIVATE = TRUE;    
+
+
+
+
+
+string npcCard="My Dancer";
+key dancerID;
+integer danceIndex;
+list danceList;
+
+updateDanceList()
+{
+    DEBUG("updateDanceList()");
+    
+    integer anims=llGetInventoryNumber(INVENTORY_ANIMATION);
+    while(--anims > -1)
+    {
+        danceList+=llGetInventoryName(INVENTORY_ANIMATION,anims);
+    }
+    if (danceSeq=="seq")
+        danceList=llListSort(danceList,1,TRUE);
+    else
+        danceList=llListRandomize(danceList,1);
+    
+    danceIndex=0;
+
+    DEBUG("We have " + (string) llGetListLength(danceList) + " animations");
+    
+} 
+startDancing()
+{
+    DEBUG("StartDancing()");
+
+        
+    
+    string dance=llList2String(danceList,danceIndex);
+    
+    osAvatarPlayAnimation(dancerID,dance);
+    DEBUG("playing animation " + dance);
+    
+    llSleep(0.25);
+    
+    list animToStop=llGetAnimationList(dancerID);
+    
+    DEBUG(llDumpList2String(animToStop,"-"));
+    
+    integer stop=llGetListLength(animToStop);
+    
+    DEBUG("List L = " + (string) stop);
+    
+    key dontStop=llGetInventoryKey(dance);
+    DEBUG("key dont stop = " + (string) dontStop);
+    
+    while(stop-- > 0)
+    {
+        if (llList2Key(animToStop,stop)!= dontStop) {
+            string tostop = llList2Key(animToStop,stop);
+            osAvatarStopAnimation(dancerID,tostop);
+            DEBUG("Stopping animation:" + tostop);
+        }
+    }
+
+    if (RADIUS > 0.0)
+        llSensorRepeat("","",AGENT,RADIUS,PI,RATE);
+    else 
+        llSetTimerEvent(danceTimer); 
+}
+rezDancer()
+{
+    DEBUG("rezDancer()");
+    
+    if (!llGetListLength(danceList))
+    {
+        llOwnerSay("Cannot create the dancer because there are no animations in the poseball inventory to play");
+        return;
+    }
+    
+    if (llGetInventoryType(npcCard)!=INVENTORY_NOTECARD)
+    {
+        llOwnerSay("Cannot create the dancer because there is no stored appearance in inventory");
+        return;
+    }
+    
+    if (NpcIsSeated()) {
+        DEBUG(" NPC already in world - starting animation");
+        startDancing();
+    } else {
+        DEBUG("NPC rezzing");
+        dancerID = osNpcCreate(dancerFirstName,dancerLastName,llGetPos()+ RezPos ,npcCard, NPCOptions);
+        llSetObjectDesc(dancerID);    
+        llSleep(0.5);
+        osNpcSit(dancerID,llGetKey(),OS_NPC_SIT_NOW);
+    }
+}
+removeDancer()
+{
+    
+    
+
+    
+    if (dancerID == NULL_KEY || ! NpcIsSeated() ) {
+        
+        dancerID = llGetObjectDesc();
+    }
+
+    if (llStringLength(dancerID)) {
+        
+        osNpcRemove(dancerID);
+    }
+    dancerID=NULL_KEY;
+    llSetObjectDesc("");
+}
+playNextDance()
+{
+    DEBUG("playNextDance()");
+
+    
+    osAvatarStopAnimation(dancerID,llList2String(danceList,danceIndex));
+    DEBUG("Stopping animation " + llList2String(danceList,danceIndex));
+    
+    danceIndex++;
+    if (danceIndex==llGetListLength(danceList))
+        danceIndex=0;   
+    
+    DEBUG("Starting animation " + llList2String(danceList,danceIndex));
+    osAvatarPlayAnimation(dancerID,llList2String(danceList,danceIndex));
+    
+}
+integer NpcIsSeated()
+{
+    
+    
+    
+        
+    key sitterID=llAvatarOnSitTarget();
+
+    if (sitterID != NULL_KEY)
+    {
+        if (osIsNpc(sitterID))
+        {
+            dancerID=sitterID;
+            return TRUE;
+        }
+        else
+        {
+            return FALSE;
+        }
+    }
+
+    return FALSE;
+}
+
+
+
+DEBUG(string str)
+{
+    if (debug)
+        llOwnerSay( str);                    
+    if (iTitleText)
+    {
+        llSleep(0.1);
+        llSetText(str,<1.0,1.0,1.0>,1.0);    
+    }
+}
+
+
+
+BootDancer()
+{
+   
+
+    if (dancerID==NULL_KEY || ! NpcIsSeated() ){
+        DEBUG("No NPC key in RAM");
+        rezDancer();
+        danceIndex=0;    
+    }
+
+    
+}
+default
+{
+    state_entry()
+    {
+        DEBUG("Reboot");
+        removeDancer(); 
+            
+        
+        if (offSet==ZERO_VECTOR)
+            offSet.z+=0.0001;
+
+        
+        llSitTarget(offSet,llEuler2Rot(rot * DEG_TO_RAD)) ;
+        
+        
+        updateDanceList();
+
+        if (INVENTORY_NOTECARD == llGetInventoryType(npcCard)) {
+
+            
+            if (active ) {
+                rezDancer();
+            } 
+        }
+    }
+    
+    link_message(integer Sender, integer Number, string String, key Key) // This script is in the object too.
+    {
+        //llOwnerSay(String);
+        if(String == "day")
+        {
+            rezDancer();
+        }
+        if(String == "night")
+        {
+            removeDancer();
+        }
+        
+    }
+    
+    timer()
+    {
+        
+        if ((dancerID==NULL_KEY) || (llAvatarOnSitTarget()!=dancerID))
+            llSetTimerEvent(0.0);   
+        else
+            playNextDance();
+    }
+    on_rez(integer start)
+    {
+        
+        llResetScript();
+    }
+    changed(integer change)
+    {
+        
+        if (change & CHANGED_OWNER)
+            llResetScript();
+        else if (change & CHANGED_REGION_START)
+            llResetScript();
+        else if (change & CHANGED_REGION_RESTART)    
+            llResetScript();
+        
+        else if (change & CHANGED_INVENTORY)
+        {
+            DEBUG("Inventory Changed");
+            
+            if ((llGetInventoryType(npcCard)!=INVENTORY_NOTECARD) && (dancerID==NULL_KEY))
+            {
+                llOwnerSay("You have deleted the dancer notecard. Removing the dancer");
+                removeDancer();
+                return;
+            }
+            
+            integer anims=llGetInventoryNumber(INVENTORY_ANIMATION);
+            if (!anims && (dancerID!=NULL_KEY))
+            {
+                
+                llOwnerSay("There are no animations in the poseball...removing your dancer");
+                removeDancer();
+            }
+            else if (anims!=llGetListLength(danceList))
+            {
+                DEBUG("Update Dance List");
+                updateDanceList();
+                if (dancerID!=NULL_KEY) {
+                    startDancing();
+                }
+            }
+        }
+        
+        else if (change & CHANGED_LINK)
+        {
+            DEBUG("Inventory Changed Link");
+            
+            osAvatarStopAnimation(dancerID,"sit");
+            
+            
+            
+            if (dancerID!=NULL_KEY && llAvatarOnSitTarget()==dancerID)
+                startDancing();
+            
+            
+        }
+    }
+    touch_start(integer num)
+    {
+        
+        if (PRIVATE) {
+            if (llDetectedKey(0)!=llGetOwner())
+                return;
+        }
+        
+        if (llGetInventoryType(npcCard)!=INVENTORY_NOTECARD)
+        {
+            llOwnerSay("One moment while your appearance is saved for the npc to use");
+            osOwnerSaveAppearance(npcCard);
+            llSleep(2.0);
+        }
+        
+        if (dancerID==NULL_KEY)
+        {
+            BootDancer();
+        }
+        
+        else {
+            removeDancer();
+            llSetTimerEvent(0);
+            llSensorRemove();
+        }
+    } 
+
+    sensor(integer n)
+    {
+        BootDancer();
+    }
+    
+    no_sensor()
+    {
+        if (dancerID)
+            removeDancer();
+    }
+}
+

@@ -1,0 +1,28 @@
+string Destination = "hg.osgrid.org:80:Aestia"; 
+vector LandingPoint = <172,108,21>; 
+vector LookAt = <1,1,1>; 
+
+default
+{
+  on_rez(integer start_param)
+  {
+    llResetScript();
+  }
+  changed(integer change) 
+  {
+    if(change & CHANGED_OWNER)
+      llResetScript();
+    else if (change & 256) 
+      llResetScript();
+  }
+  state_entry()
+  {
+    llWhisper(0, "OS Teleporter Activated");
+  }
+  touch_start(integer num_detected) 
+  {
+    key avatar = llDetectedKey(0);
+    llInstantMessage(avatar, "Teleporting you to RelaxIslands at : "+Destination);
+    osTeleportAgent(avatar, Destination, LandingPoint, LookAt); 
+  }
+}
