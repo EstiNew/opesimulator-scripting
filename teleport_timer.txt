@@ -1,0 +1,49 @@
+// This is modified TP script, original creator is lost in translations, original script was in french at first. This script is skybox or //parcel 1 h rental teleport, it won't let others to use teleport until 1 h has passed
+string Destination = "YourLand"; // your target destination here (SEE NEXT LINES) Can Be
+vector LandingPoint = <37,32,4507>; // X,Y,Z landing point for avatar to arrive at
+vector LookAt = <1,1,1>; // which way they look at when arriving
+//
+
+float last_time = 0.0;
+
+float cooldown_time = 3600.0; //this is next person waiting time in seconds, 3600 = 1h
+
+default
+{
+  on_rez(integer start_param)
+  {
+    llResetScript();
+  }
+  changed(integer change) // something changed, take action
+  {
+    if(change & CHANGED_OWNER)
+      llResetScript();
+    else if (change & 256) // that bit is set during a region restart
+      llResetScript();
+  }
+  state_entry()
+  {
+    llWhisper(0, "Ready");
+  }
+  touch_start(integer num_detected) 
+  {
+    float time = llGetTime();
+    key avatar = llDetectedKey(0);
+    float passed_time = time - last_time;
+    //llInstantMessage(avatar, "time: " + time + " last_time: " + last_time + " passed_time: " + passed_time);
+    
+    if( (last_time == 0.0) || (passed_time > cooldown_time) )
+    {
+        llInstantMessage(avatar, "Teleporting you to YOURPARCEL where you have 1h. of time at : "+Destination);
+        osTeleportAgent(avatar, Destination, LandingPoint, LookAt);  //where at destination
+        last_time = time;
+    }
+    else
+    {
+        integer remaining = (integer) (cooldown_time - passed_time);
+        integer secs = remaining % 60;
+        integer mins = (remaining / 60) % 60;
+        llInstantMessage(avatar, "Teleport to this location is busy for " + mins + "m " + secs + "s");
+    }
+  }
+}
