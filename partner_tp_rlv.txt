@@ -1,0 +1,31 @@
+key partnerKey = "uuid";
+
+default
+{
+    state_entry()
+    {
+    }
+
+    on_rez(integer start_param)
+    {
+        // Lock ring
+        llOwnerSay("@detach=n");
+        // Accept TP offers from partner
+        llOwnerSay("@accepttp:"+(string)partnerKey+"=add");
+    }
+
+    touch_start(integer total_number)
+    {
+        // Who touched me
+        key avatarKey = llDetectedKey(0);
+        // Who is my owner
+        key ownerKey = llGetOwner();
+
+        // Did owner touch me
+        if(avatarKey == ownerKey)
+        {
+            // Unlock ring
+            llOwnerSay("@detach=y");
+        }
+    }
+}
