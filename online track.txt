@@ -1,3 +1,4 @@
+// this scrips should be entered to objest, such as cloth, hair, bodypart, given to target
 key ownerkey;
 string agent;
 integer x = 0;
